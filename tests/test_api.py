@@ -118,3 +118,56 @@ def test_post_maintenance(db):
         "timestamp": "2026-06-06 09:00:00",
     })
     assert r.status == 400
+
+
+def test_stats_with_date_range(db):
+    r = request(app, "GET", "/api/stats?start=2026-06-02+00:00:00&end=2026-06-02+23:59:59")
+    assert r.status == 200
+    stats = r.json()
+    assert stats["total_brews"] == 1
+    per_drink = {d["name"]: d["count"] for d in stats["per_drink"]}
+    assert per_drink["latte"] == 1
+    assert per_drink["espresso"] == 0
+
+
+def test_stats_start_only(db):
+    r = request(app, "GET", "/api/stats?start=2026-06-02+00:00:00")
+    assert r.status == 200
+    stats = r.json()
+    assert stats["total_brews"] == 1
+
+
+def test_stats_end_only(db):
+    r = request(app, "GET", "/api/stats?end=2026-06-01+23:59:59")
+    assert r.status == 200
+    stats = r.json()
+    assert stats["total_brews"] == 2
+
+
+def test_stats_start_after_end_error(db):
+    r = request(app, "GET", "/api/stats?start=2026-06-05+00:00:00&end=2026-06-01+00:00:00")
+    assert r.status == 400
+    assert "start must not be after end" in r.json()["detail"]
+
+
+def test_stats_unparsable_timestamp(db):
+    r = request(app, "GET", "/api/stats?start=banana")
+    assert r.status == 400
+    assert "unparsable" in r.json()["detail"]
+
+
+def test_machine_health_with_date_range(db):
+    r = request(app, "GET", "/api/machines/1?start=2026-06-02+00:00:00&end=2026-06-02+23:59:59")
+    assert r.status == 200
+    health = r.json()
+    assert health["brew_count"] == 0
+    assert health["last_brew"] is None
+    assert health["last_maintenance"]["type"] == "descale"
+
+
+def test_machine_health_date_range_preserves_maintenance(db):
+    r = request(app, "GET", "/api/machines/1?start=2026-06-01+00:00:00&end=2026-06-01+23:59:59")
+    assert r.status == 200
+    health = r.json()
+    assert health["brew_count"] == 2
+    assert health["last_maintenance"]["type"] == "descale"

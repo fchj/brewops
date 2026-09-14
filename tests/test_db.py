@@ -75,3 +75,96 @@ def test_reset_db_clears_events(conn):
     reset_db(conn)
     assert get_stats(conn)["total_brews"] == 0
     assert len(get_machines(conn)) == 4
+
+
+def test_stats_with_date_range(conn):
+    insert_brew(conn, 1, "espresso", "2026-06-01 08:00:00", 27.5, 92.0, "csv")
+    insert_brew(conn, 1, "espresso", "2026-06-01 09:00:00", 26.0, 91.5, "csv")
+    insert_brew(conn, 2, "latte", "2026-06-02 10:00:00", 44.0, 88.0, "csv")
+    insert_brew(conn, 3, "lungo", "2026-06-03 11:00:00", 38.0, 90.0, "manual")
+    conn.commit()
+
+    stats = get_stats(conn, start="2026-06-02 00:00:00", end="2026-06-02 23:59:59")
+    assert stats["total_brews"] == 1
+    per_drink = {d["name"]: d["count"] for d in stats["per_drink"]}
+    assert per_drink["latte"] == 1
+    assert per_drink["espresso"] == 0
+    assert per_drink["lungo"] == 0
+    assert len(stats["per_day"]) == 1
+
+
+def test_stats_with_start_only(conn):
+    insert_brew(conn, 1, "espresso", "2026-06-01 08:00:00", 27.5, 92.0, "csv")
+    insert_brew(conn, 1, "espresso", "2026-06-01 09:00:00", 26.0, 91.5, "csv")
+    insert_brew(conn, 2, "latte", "2026-06-02 10:00:00", 44.0, 88.0, "csv")
+    conn.commit()
+
+    stats = get_stats(conn, start="2026-06-02 00:00:00")
+    assert stats["total_brews"] == 1
+    per_drink = {d["name"]: d["count"] for d in stats["per_drink"]}
+    assert per_drink["latte"] == 1
+    assert per_drink["espresso"] == 0
+
+
+def test_stats_with_end_only(conn):
+    insert_brew(conn, 1, "espresso", "2026-06-01 08:00:00", 27.5, 92.0, "csv")
+    insert_brew(conn, 1, "espresso", "2026-06-01 09:00:00", 26.0, 91.5, "csv")
+    insert_brew(conn, 2, "latte", "2026-06-02 10:00:00", 44.0, 88.0, "csv")
+    conn.commit()
+
+    stats = get_stats(conn, end="2026-06-01 23:59:59")
+    assert stats["total_brews"] == 2
+    per_drink = {d["name"]: d["count"] for d in stats["per_drink"]}
+    assert per_drink["espresso"] == 2
+    assert per_drink["latte"] == 0
+
+
+def test_stats_with_empty_range(conn):
+    insert_brew(conn, 1, "espresso", "2026-06-01 08:00:00", 27.5, 92.0, "csv")
+    insert_brew(conn, 1, "espresso", "2026-06-01 09:00:00", 26.0, 91.5, "csv")
+    conn.commit()
+
+    stats = get_stats(conn, start="2026-06-05 00:00:00", end="2026-06-10 23:59:59")
+    assert stats["total_brews"] == 0
+    per_drink = {d["name"]: d["count"] for d in stats["per_drink"]}
+    assert per_drink["espresso"] == 0
+    assert per_drink["cappuccino"] == 0
+    assert stats["per_day"] == []
+
+
+def test_stats_boundary_inclusive(conn):
+    insert_brew(conn, 1, "espresso", "2026-06-01 00:00:00", 27.5, 92.0, "csv")
+    insert_brew(conn, 1, "espresso", "2026-06-01 23:59:59", 26.0, 91.5, "csv")
+    conn.commit()
+
+    stats = get_stats(conn, start="2026-06-01 00:00:00", end="2026-06-01 23:59:59")
+    assert stats["total_brews"] == 2
+
+
+def test_machine_health_with_date_range(conn):
+    insert_brew(conn, 4, "espresso", "2026-06-01 08:00:00", 27.0, 92.0, "csv")
+    insert_brew(conn, 4, "espresso", "2026-06-02 09:00:00", 26.0, 91.5, "csv")
+    insert_brew(conn, 4, "latte", "2026-06-03 10:00:00", 44.0, 88.0, "csv")
+    insert_maintenance(conn, 4, "descale", "2026-06-04 18:00:00", note="quarterly descale")
+    insert_maintenance(conn, 4, "error", "2026-06-05 09:15:00", error_code="E42")
+    conn.commit()
+
+    health = get_machine_health(conn, 4, start="2026-06-02 00:00:00", end="2026-06-03 23:59:59")
+    assert health["brew_count"] == 2
+    assert health["last_brew"] == "2026-06-03 10:00:00"
+    assert health["last_maintenance"]["type"] == "descale"
+    assert health["recent_errors"][0]["error_code"] == "E42"
+
+
+def test_machine_health_empty_range(conn):
+    insert_brew(conn, 4, "espresso", "2026-06-01 08:00:00", 27.0, 92.0, "csv")
+    insert_maintenance(conn, 4, "descale", "2026-06-03 18:00:00", note="quarterly descale")
+    insert_maintenance(conn, 4, "error", "2026-06-04 09:15:00", error_code="E42")
+    conn.commit()
+
+    health = get_machine_health(conn, 4, start="2026-06-05 00:00:00", end="2026-06-10 23:59:59")
+    assert health["brew_count"] == 0
+    assert health["last_brew"] is None
+    assert health["specialty"] is None
+    assert health["last_maintenance"]["type"] == "descale"
+    assert health["recent_errors"][0]["error_code"] == "E42"
