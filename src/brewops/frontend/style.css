@@ -373,6 +373,11 @@ main {
   padding: 0.18rem 0.7rem;
 }
 
+.specialty {
+  font-weight: 600;
+  color: var(--brass-deep);
+}
+
 .errors {
   margin-top: 0.7rem;
   color: var(--warn);
