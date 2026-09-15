@@ -9,6 +9,9 @@ async function fetchJSON(url, options) {
   return response.json();
 }
 
+// ---- module-level state ----
+let currentRange = { start: null, end: null };
+
 // ---- dashboard ----
 
 function renderDrinkBars(perDrink) {
@@ -29,7 +32,16 @@ function renderDrinkBars(perDrink) {
 function renderTimeline(perDay) {
   const svg = document.getElementById("timeline");
   svg.innerHTML = "";
-  if (perDay.length === 0) return;
+  if (perDay.length === 0) {
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", "50%");
+    text.setAttribute("y", "50%");
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("class", "timeline-empty");
+    text.textContent = "No brews in this range";
+    svg.appendChild(text);
+    return;
+  }
   const width = 600;
   const height = 130;
   const max = Math.max(...perDay.map((d) => d.count));
@@ -63,18 +75,31 @@ function renderMachineCards(healths) {
           .map((e) => `${e.error_code || "?"} (${e.timestamp.slice(0, 10)})`)
           .join(", ")}</p>`
       : "";
+    const specialty = m.specialty
+      ? `<p class="specialty">Specialty: ${m.specialty.label} (${m.specialty.count})</p>`
+      : "";
     card.innerHTML = `
       <h3>${m.name}</h3>
       <p class="badge">${m.has_telemetry ? "telemetry" : "manual log"}</p>
       <p>${m.brew_count} brews · last ${m.last_brew ? m.last_brew.slice(0, 16) : "never"}</p>
+      ${specialty}
       <p>Last maintenance: ${maintenance}</p>
       ${errors}`;
     container.appendChild(card);
   }
 }
 
+function buildRangeQuery() {
+  const params = new URLSearchParams();
+  if (currentRange.start) params.set("start", currentRange.start);
+  if (currentRange.end) params.set("end", currentRange.end);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
 async function loadDashboard() {
-  const stats = await fetchJSON("/api/stats");
+  const qs = buildRangeQuery();
+  const stats = await fetchJSON("/api/stats" + qs);
   document.getElementById("total-brews").textContent = stats.total_brews;
   const lastDay = stats.per_day[stats.per_day.length - 1];
   document.getElementById("brews-today").textContent = lastDay ? lastDay.count : 0;
@@ -83,7 +108,9 @@ async function loadDashboard() {
 
   const machines = await fetchJSON("/api/machines");
   document.getElementById("machine-count").textContent = machines.length;
-  const healths = await Promise.all(machines.map((m) => fetchJSON(`/api/machines/${m.id}`)));
+  const healths = await Promise.all(
+    machines.map((m) => fetchJSON(`/api/machines/${m.id}${qs}`))
+  );
   renderMachineCards(healths);
 }
 
@@ -113,6 +140,23 @@ async function setupForms() {
   fillSelect(document.getElementById("maintenance-machine"), machines, "id", "name");
   document.getElementById("brew-timestamp").value = localNow();
   document.getElementById("maintenance-timestamp").value = localNow();
+
+  document.getElementById("filter-apply").addEventListener("click", () => {
+    const startDate = document.getElementById("filter-start").value;
+    const endDate = document.getElementById("filter-end").value;
+    currentRange = {
+      start: startDate ? `${startDate} 00:00:00` : null,
+      end: endDate ? `${endDate} 23:59:59` : null,
+    };
+    loadDashboard().catch((error) => console.error("Dashboard failed to load:", error));
+  });
+
+  document.getElementById("filter-clear").addEventListener("click", () => {
+    document.getElementById("filter-start").value = "";
+    document.getElementById("filter-end").value = "";
+    currentRange = { start: null, end: null };
+    loadDashboard().catch((error) => console.error("Dashboard failed to load:", error));
+  });
 
   document.getElementById("brew-form").addEventListener("submit", (event) =>
     submitForm(event, "/api/brews", "brew-message", () => ({

@@ -114,29 +114,35 @@ main {
   gap: 1.35rem;
 }
 
-/* KPI band across the top */
-.stat-tiles {
+/* date filter at the very top */
+#dashboard > .date-filter {
   grid-column: 1 / -1;
   grid-row: 1;
+}
+
+/* KPI band below the filter */
+.stat-tiles {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 /* hero row: wide trend chart + a narrower breakdown beside it */
 #dashboard > .panel:has(#timeline) {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   display: flex;
   flex-direction: column;
 }
 
 #dashboard > .panel:has(#drink-bars) {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
 }
 
 /* fleet gallery spans full width below the hero row */
 #dashboard > .panel:has(#machine-cards) {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 4;
 }
 
 /* the two logging forms sit side by side under the dashboard */
@@ -373,6 +379,11 @@ main {
   padding: 0.18rem 0.7rem;
 }
 
+.specialty {
+  font-weight: 600;
+  color: var(--brass-deep);
+}
+
 .errors {
   margin-top: 0.7rem;
   color: var(--warn);
@@ -478,6 +489,74 @@ main {
   background: rgb(185 129 47 / 0.25);
 }
 
+/* ---- date filter: the range selector ---- */
+.date-filter {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto auto;
+  gap: 0.85rem 1rem;
+  align-items: center;
+}
+
+.date-filter label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+
+.date-filter input {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.date-filter input:focus {
+  outline: none;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px rgb(185 129 47 / 0.22);
+}
+
+.date-filter button {
+  padding: 0.65rem 1.2rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--brass), var(--brass-deep));
+  color: #fff8ee;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(138 90 28 / 0.3);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  font-size: 0.82rem;
+}
+
+.date-filter button:hover {
+  filter: brightness(1.07);
+  box-shadow: var(--shadow-lift);
+}
+
+.date-filter button:active {
+  transform: translateY(1px);
+}
+
+.date-filter button:focus-visible {
+  outline: 3px solid rgb(185 129 47 / 0.5);
+  outline-offset: 2px;
+}
+
+.timeline-empty {
+  font-size: 0.92rem;
+  fill: var(--ink-soft);
+}
+
 /* tablet & below: collapse the bento to a single column */
 @media (max-width: 820px) {
   main {
@@ -505,6 +584,19 @@ main {
   }
   main {
     padding: 1.5rem 1rem 2.5rem;
+  }
+  .date-filter {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+  .date-filter label {
+    display: none;
+  }
+  .date-filter input {
+    width: 100%;
+  }
+  .date-filter button {
+    width: 100%;
   }
   .form-panel form {
     grid-template-columns: 1fr;
